@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kutubxona</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&display=swap">
+<style>
+:root{--bg:#1c2523;--panel:#26322f;--line:#3a4944;--text:#e3e8e0;--mute:#9aa8a1;--acc:#d6b46a;--accT:#1c2523}
+:root[data-t="light"]{--bg:#e4e9e1;--panel:#f1f4ee;--line:#c9d1c6;--text:#1f2b28;--mute:#5c6b65;--acc:#7a5c1e;--accT:#f1f4ee}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.5 Literata,Georgia,serif}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+header{display:flex;gap:12px;align-items:center;padding:16px clamp(16px,4vw,48px);position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--line)}
+h1{font-size:1.4rem;margin:0;font-weight:600;white-space:nowrap}
+#q{flex:1;max-width:520px;margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:9px 18px}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.btn:hover{border-color:var(--acc)}
+main{padding:24px clamp(16px,4vw,48px) 64px}
+#info{color:var(--mute);margin:0 0 20px}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:22px}
+.book{aspect-ratio:2/3;border:0;border-radius:4px 10px 10px 4px;padding:18px 14px 14px 22px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;color:#f1eee4;position:relative;box-shadow:0 6px 14px #0006;transition:transform .2s}
+.book:hover{transform:translateY(-6px)}
+.book::before{content:"";position:absolute;inset:0 auto 0 0;width:10px;background:#0003;border-radius:4px 0 0 4px}
+.book b{font-weight:600;font-size:1.05rem;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical}
+.book small{opacity:.7;font-size:.75rem}
+.empty{max-width:560px;background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:24px}
+.empty code{background:var(--bg);padding:2px 6px;border-radius:4px}
+/* reader */
+#reader{position:fixed;inset:0;background:#141b1a;display:none;flex-direction:column;z-index:10;color:#e3e8e0}
+#reader.on{display:flex}
+#bar{display:flex;gap:10px;align-items:center;padding:10px 16px;background:#1c2523;border-bottom:1px solid #3a4944}
+#bar .btn{background:#26322f;border-color:#3a4944}
+#title{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
+#pg{width:64px;text-align:center;background:#26322f;border:1px solid #3a4944;border-radius:8px;padding:6px}
+#stage{flex:1;display:flex;align-items:center;justify-content:center;perspective:2200px;position:relative;overflow:hidden;min-height:0}
+#spread{display:flex;position:relative;box-shadow:0 20px 50px #000a;background:#fff}
+#spread canvas{display:block;transition:filter .2s}
+#spread.eye canvas,.leaf.eye{filter:sepia(.35) brightness(.9) contrast(.95)}
+#spread::after{content:"";position:absolute;top:0;bottom:0;left:50%;width:40px;margin-left:-20px;background:linear-gradient(90deg,#0000,#0003 50%,#0000);pointer-events:none}
+#spread.one::after{display:none}
+.leaf{position:absolute;top:0;backface-visibility:hidden;z-index:3;pointer-events:none;box-shadow:0 0 30px #0007}
+.leaf.next{transform-origin:left center;animation:fn .55s ease-in forwards}
+.leaf.prev{transform-origin:right center;animation:fp .55s ease-in forwards}
+@keyframes fn{to{transform:rotateY(-95deg);filter:brightness(.6)}}
+@keyframes fp{to{transform:rotateY(95deg);filter:brightness(.6)}}
+.nav{position:absolute;top:0;bottom:0;width:12%;background:none;border:0;color:#fff8;font-size:2rem;z-index:4}
+.nav:hover{background:#ffffff0d;color:#fff}
+#pv{left:0}#nx{right:0}
+#msg{position:absolute;color:#9aa8a1}
+@media (prefers-reduced-motion:reduce){.leaf{animation-duration:.01s!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Kutubxona</h1>
+  <input id="q" type="search" placeholder="Kitob nomini qidiring…  ( / )" autocomplete="off" aria-label="Qidirish">
+  <button class="btn" id="theme" title="Mavzuni almashtirish">Mavzu</button>
+</header>
+<main>
+  <p id="info"></p>
+  <div id="grid"></div>
+  <div id="empty" class="empty" hidden>
+    <p><b>Kitoblar topilmadi.</b></p>
+    <p>Bu sahifani <code>kitoblar</code> papkasi yonida joylashtiring va oddiy veb-serverda oching (masalan, papkada <code>python -m http.server</code>).</p>
+    <p>Fayl sifatida (file://) ochgan bo'lsangiz, papkani qo'lda tanlang:</p>
+    <button class="btn" id="pick">Kitoblar papkasini tanlash</button>
+    <input type="file" id="dir" webkitdirectory multiple hidden>
+  </div>
+</main>
+
+<section id="reader" aria-label="O'qish oynasi">
+  <div id="bar">
+    <button class="btn" id="close">Yopish</button>
+    <span id="title"></span>
+    <button class="btn" id="eye" title="Ko'zni asrash rejimi">Ko'z rejimi</button>
+    <input id="pg" type="number" min="1" aria-label="Sahifa raqami"><span id="tot"></span>
+  </div>
+  <div id="stage">
+    <button class="nav" id="pv" aria-label="Oldingi sahifa">‹</button>
+    <div id="spread"><canvas id="cL"></canvas><canvas id="cR"></canvas></div>
+    <button class="nav" id="nx" aria-label="Keyingi sahifa">›</button>
+    <span id="msg"></span>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+const DIR='kitoblar/';
+const $=s=>document.querySelector(s);
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let books=[]; // {name, src(url|File)}
+
+/* mavzu */
+const root=document.documentElement;
+try{root.dataset.t=localStorage.getItem('t')||'dark'}catch{root.dataset.t='dark'}
+$('#theme').onclick=()=>{root.dataset.t=root.dataset.t==='dark'?'light':'dark';try{localStorage.setItem('t',root.dataset.t)}catch{}};
+
+/* kitoblar ro'yxati */
+const nameOf=f=>decodeURIComponent(f).replace(/\.pdf$/i,'').trim();
+async function load(){
+  let files=[];
+  try{const r=await fetch(DIR+'books.json');if(r.ok)files=(await r.json()).map(x=>typeof x==='string'?x:x.file)}catch{}
+  if(!files.length){
+    try{
+      const r=await fetch(DIR);
+      if(r.ok){
+        const d=new DOMParser().parseFromString(await r.text(),'text/html');
+        files=[...d.querySelectorAll('a')].map(a=>a.getAttribute('href')).filter(h=>h&&/\.pdf$/i.test(h)).map(h=>decodeURIComponent(h.split('/').pop()));
+      }
+    }catch{}
+  }
+  books=[...new Set(files)].map(f=>({name:nameOf(f),src:DIR+encodeURIComponent(f)}));
+  render();
+}
+$('#pick').onclick=()=>$('#dir').click();
+$('#dir').onchange=e=>{
+  books=[...e.target.files].filter(f=>/\.pdf$/i.test(f.name)).map(f=>({name:nameOf(f.name),src:f}));
+  render();
+};
+
+/* qidiruv va ko'rsatish */
+const norm=s=>s.toLowerCase().replace(/[ʻʼ`’‘']/g,"'");
+function hue(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))%360;return h}
+function render(){
+  const q=norm($('#q').value.trim());
+  const list=books.filter(b=>norm(b.name).includes(q)).sort((a,b)=>a.name.localeCompare(b.name,'uz'));
+  $('#empty').hidden=books.length>0;
+  $('#info').textContent=!books.length?'':q?`${list.length} ta kitob topildi`:`${books.length} ta kitob`;
+  if(books.length&&!list.length)$('#info').textContent='Hech narsa topilmadi. Boshqa so\'z bilan urinib ko\'ring.';
+  $('#grid').replaceChildren(...list.map(b=>{
+    const h=hue(b.name),el=document.createElement('button');
+    el.className='book';
+    el.style.background=`linear-gradient(160deg,hsl(${h} 28% 34%),hsl(${(h+30)%360} 30% 22%))`;
+    el.innerHTML='<b></b><small>PDF</small>';
+    el.firstChild.textContent=b.name;
+    el.onclick=()=>openBook(b);
+    return el;
+  }));
+}
+$('#q').oninput=render;
+addEventListener('keydown',e=>{
+  if(e.key==='/'&&!$('#reader').classList.contains('on')&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus()}
+});
+
+/* o'qish oynasi */
+let pdf=null,cur=0,two=true,busy=false,book=null,gen=0;
+const cL=$('#cL'),cR=$('#cR'),sp=$('#spread');
+const key=()=>'p:'+book.name;
+
+async function openBook(b){
+  book=b;gen++;
+  $('#reader').classList.add('on');
+  $('#title').textContent=b.name;
+  $('#msg').textContent='Yuklanmoqda…';
+  sp.style.visibility='hidden';
+  try{
+    const src=b.src instanceof File?{data:await b.src.arrayBuffer()}:{url:b.src};
+    pdf=await pdfjsLib.getDocument(src).promise;
+  }catch(err){$('#msg').textContent="Kitobni ochib bo'lmadi. Fayl mavjudligini tekshiring.";return}
+  $('#msg').textContent='';
+  $('#tot').textContent='/ '+pdf.numPages;
+  $('#pg').max=pdf.numPages;
+  let p=1;try{p=+localStorage.getItem(key())||1}catch{}
+  go(Math.min(p,pdf.numPages),0);
+}
+function closeBook(){$('#reader').classList.remove('on');pdf=null;gen++}
+$('#close').onclick=closeBook;
+$('#eye').onclick=()=>{sp.classList.toggle('eye')};
+
+// chap sahifa = juft, o'ng sahifa = toq (muqova o'ngda yakka)
+const leftOf=p=>two?(p%2===0?p:p-1):0;
+async function draw(canvas,n,w,h){
+  if(n<1||n>pdf.numPages){canvas.style.display='none';return}
+  canvas.style.display='block';
+  const page=await pdf.getPage(n),v0=page.getViewport({scale:1});
+  const s=Math.min(w/v0.width,h/v0.height),dpr=Math.min(devicePixelRatio||1,2);
+  const v=page.getViewport({scale:s*dpr});
+  canvas.width=v.width;canvas.height=v.height;
+  canvas.style.width=v.width/dpr+'px';canvas.style.height=v.height/dpr+'px';
+  await page.render({canvasContext:canvas.getContext('2d'),viewport:v}).promise;
+}
+async function go(p,dir){
+  if(!pdf||busy||p<1||p>pdf.numPages)return;
+  busy=true;const g=gen;
+  const st=$('#stage');
+  two=st.clientWidth>=800;
+  sp.classList.toggle('one',!two);
+  const L=two?leftOf(p):0,R=two?L+1:p;
+  const w=(st.clientWidth*.76)/(two?2:1.3),h=st.clientHeight-24;
+  // eski o'ng/chap sahifadan surat olish (varaqlash animatsiyasi uchun)
+  let leaf=null;
+  if(dir&&two&&sp.style.visibility!=='hidden'){
+    const src=dir>0?cR:cL;
+    leaf=document.createElement('canvas');leaf.width=src.width;leaf.height=src.height;
+    leaf.getContext('2d').drawImage(src,0,0);
+    leaf.className='leaf '+(dir>0?'next':'prev')+(sp.classList.contains('eye')?' eye':'');
+    leaf.style.width=src.style.width;leaf.style.height=src.style.height;
+    leaf.style[dir>0?'left':'right']='50%';
+    leaf.style.top='0';
+  }
+  await Promise.all([two?draw(cL,L,w,h):(cL.style.display='none'),draw(cR,R,w,h)]);
+  if(g!==gen){busy=false;return}
+  sp.style.visibility='visible';
+  if(leaf){
+    // yangi sahifa ostida turadi, eski varaq ustida aylanadi
+    sp.appendChild(leaf);
+    if(dir>0)cL.style.visibility='hidden',setTimeout(()=>cL.style.visibility='visible',270);
+    else cR.style.visibility='hidden',setTimeout(()=>cR.style.visibility='visible',270);
+    await new Promise(r=>setTimeout(r,560));
+    leaf.remove();
+  }
+  cur=two?L||1:p;
+  $('#pg').value=cur;
+  try{localStorage.setItem(key(),cur)}catch{}
+  busy=false;
+}
+const step=()=>two?2:1;
+const next=()=>pdf&&go(two?(leftOf(cur)===0?2:leftOf(cur)+2):cur+1,1);
+const prev=()=>pdf&&go(two?Math.max(1,leftOf(cur)-2||1):cur-1,-1);
+$('#nx').onclick=next;$('#pv').onclick=prev;
+$('#pg').onchange=e=>go(Math.max(1,Math.min(pdf.numPages,+e.target.value||1)),0);
+addEventListener('keydown',e=>{
+  if(!$('#reader').classList.contains('on')||e.target===$('#pg'))return;
+  if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();next()}
+  else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();prev()}
+  else if(e.key==='Escape')closeBook();
+});
+let tx=0;
+$('#stage').addEventListener('touchstart',e=>tx=e.touches[0].clientX,{passive:true});
+$('#stage').addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>50)d<0?next():prev()});
+let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>pdf&&go(cur,0),200)});
+
+load();
+</script>
+</body>
+</html>
